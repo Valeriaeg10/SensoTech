@@ -9,6 +9,9 @@ abstract class Brazalete {
   // Lecturas en vivo (característica 0001)
   Stream<LecturaEnVivo> get lecturas;
 
+  // Ejercicio en curso (característica 0002)
+  Stream<EjercicioEnCurso> get ejercicio;
+
   Future<void> conectar();
   Future<void> desconectar();
 

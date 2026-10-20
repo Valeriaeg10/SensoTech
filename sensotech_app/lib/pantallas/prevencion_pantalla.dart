@@ -4,12 +4,14 @@ import '../modelos/datos_brazalete.dart';
 import '../modelos/perfil.dart';
 import '../modelos/sesion.dart';
 import '../servicios/brazalete.dart';
+import '../servicios/brazalete_simulado.dart';
 import '../servicios/repositorio_sesiones.dart';
 import '../tema/colores.dart';
 import '../tema/tema_app.dart';
 import '../widgets/icono_chip.dart';
 import '../widgets/indicador_estado.dart';
 import '../widgets/tarjeta_movimiento.dart';
+import '../widgets/tarjeta_pausa_activa.dart';
 
 // Modo prevención (hoja 2): postura en vivo, contadores y pausa activa
 class PrevencionPantalla extends StatefulWidget {
@@ -29,28 +31,66 @@ class PrevencionPantalla extends StatefulWidget {
 }
 
 class _PrevencionPantallaState extends State<PrevencionPantalla> {
-  StreamSubscription<LecturaEnVivo>? _sub;
+  StreamSubscription<LecturaEnVivo>? _subLecturas;
+  StreamSubscription<EjercicioEnCurso>? _subEjercicio;
   LecturaEnVivo? _ultima;
+  EjercicioEnCurso? _ejercicio;
 
   // Contadores de la jornada (en segundos)
   double _trabajo = 0;
+  double _desdePausa = 0; // se reinicia al completar una pausa
   double _fueraDeRango = 0;
   int _alertas = 0;
+  int _pausas = 0;
   bool _guardada = false;
   final DateTime _inicio = DateTime.now();
+
+  bool get _enPausa => _ultima?.fase == FaseBrazalete.pausaActiva;
 
   @override
   void initState() {
     super.initState();
-    _sub = widget.brazalete.lecturas.listen(_recibir);
+    _subLecturas = widget.brazalete.lecturas.listen(_recibir);
+    _subEjercicio = widget.brazalete.ejercicio.listen((e) => setState(() => _ejercicio = e));
   }
 
   @override
   void dispose() {
-    _sub?.cancel();
+    _subLecturas?.cancel();
+    _subEjercicio?.cancel();
     // Salió sin terminar: se guarda como incompleta (hoja 1)
     if (!_guardada && _trabajo >= 1) _guardar(completa: false);
     super.dispose();
+  }
+
+  // Cada lectura equivale a 0,1 s
+  void _recibir(LecturaEnVivo l) {
+    final antes = _ultima;
+    setState(() {
+      _trabajo += 0.1;
+      if (l.fase == FaseBrazalete.pausaActiva) {
+        // Empezó la pausa
+        if (antes?.fase != FaseBrazalete.pausaActiva) _avisar('Hora de la pausa activa');
+      } else {
+        _desdePausa += 0.1;
+        if (l.estado != EstadoPostura.verde) _fueraDeRango += 0.1;
+        if (l.estado == EstadoPostura.rojo && antes?.estado != EstadoPostura.rojo) _alertas++;
+        // Terminó la pausa: contarla y reiniciar el tiempo de trabajo
+        if (antes?.fase == FaseBrazalete.pausaActiva) {
+          _pausas++;
+          _desdePausa = 0;
+          _ejercicio = null;
+          _avisar('¡Pausa activa completada!');
+        }
+      }
+      _ultima = l;
+    });
+  }
+
+  void _avisar(String texto) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(texto), behavior: SnackBarBehavior.floating),
+    );
   }
 
   // Guarda la jornada en el historial del perfil
@@ -64,30 +104,17 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
       segundosTrabajo: _trabajo.round(),
       segundosFuera: _fueraDeRango.round(),
       alertas: _alertas,
+      pausas: _pausas,
       completa: completa,
     ));
-  }
-
-  // Cada lectura equivale a 0,1 s
-  void _recibir(LecturaEnVivo l) {
-    setState(() {
-      _trabajo += 0.1;
-      if (l.estado != EstadoPostura.verde) _fueraDeRango += 0.1;
-      final pasoARojo =
-          l.estado == EstadoPostura.rojo && _ultima?.estado != EstadoPostura.rojo;
-      if (pasoARojo) _alertas++;
-      _ultima = l;
-    });
   }
 
   String _formato(double segundos) {
     final s = segundos.floor();
     final h = s ~/ 3600;
-    final m = (s % 3600) ~/ 60;
-    final ss = s % 60;
-    final mm = m.toString().padLeft(2, '0');
-    final sss = ss.toString().padLeft(2, '0');
-    return h > 0 ? '$h:$mm:$sss' : '$mm:$sss';
+    final mm = ((s % 3600) ~/ 60).toString().padLeft(2, '0');
+    final ss = (s % 60).toString().padLeft(2, '0');
+    return h > 0 ? '$h:$mm:$ss' : '$mm:$ss';
   }
 
   Future<void> _terminar() async {
@@ -105,6 +132,7 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
             _filaResumen('Tiempo de trabajo', _formato(_trabajo)),
             _filaResumen('Fuera de rango', '${_formato(_fueraDeRango)} ($porcentaje %)'),
             _filaResumen('Alertas', '$_alertas'),
+            _filaResumen('Pausas activas', '$_pausas'),
             const SizedBox(height: 8),
             const Text('Guardado en el historial',
                 style: TextStyle(color: Colores.verde, fontSize: 12, fontWeight: FontWeight.w600)),
@@ -115,7 +143,7 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
         ],
       ),
     );
-    if (mounted) Navigator.pop(context); // vuelve a elegir modo
+    if (mounted) Navigator.pop(context, false); // false = no pidió cambiar modo
   }
 
   Widget _filaResumen(String titulo, String valor) {
@@ -133,19 +161,19 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
   @override
   Widget build(BuildContext context) {
     final l = _ultima;
+    final e = _ejercicio;
+    final simulado = widget.brazalete is BrazaleteSimulado;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Prevención'),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Chip(
-              avatar: const Icon(Icons.work_outline_rounded, size: 18, color: Colores.primario),
-              label: Text(widget.tipo.texto),
-              backgroundColor: Colores.azulSuave,
-              side: BorderSide.none,
-            ),
+          TextButton.icon(
+            onPressed: () => Navigator.pop(context, true), // true = cambiar modo
+            icon: const Icon(Icons.swap_horiz_rounded),
+            label: const Text('Cambiar modo'),
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: SafeArea(
@@ -154,9 +182,14 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
             : ListView(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 children: [
-                  IndicadorEstado(estado: l.estado),
-                  const SizedBox(height: 16),
-                  _tarjetaPausa(),
+                  // Durante la pausa se muestra el ejercicio guiado
+                  if (_enPausa && e != null)
+                    TarjetaPausaActiva(ejercicio: e, lectura: l)
+                  else ...[
+                    IndicadorEstado(estado: l.estado),
+                    const SizedBox(height: 16),
+                    _tarjetaPausa(simulado),
+                  ],
                   const SizedBox(height: 16),
                   TarjetaMovimiento(lectura: l),
                   const SizedBox(height: 16),
@@ -174,9 +207,9 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
                     children: [
                       Expanded(child: _dato(Icons.schedule_rounded, 'Trabajo', _formato(_trabajo))),
                       const SizedBox(width: 10),
-                      Expanded(child: _dato(Icons.timer_off_outlined, 'Fuera rango', _formato(_fueraDeRango))),
-                      const SizedBox(width: 10),
                       Expanded(child: _dato(Icons.notifications_active_outlined, 'Alertas', '$_alertas')),
+                      const SizedBox(width: 10),
+                      Expanded(child: _dato(Icons.self_improvement_rounded, 'Pausas', '$_pausas')),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -192,10 +225,10 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
   }
 
   // Cuenta regresiva para la pausa activa
-  Widget _tarjetaPausa() {
+  Widget _tarjetaPausa(bool simulado) {
     final total = widget.tipo.minutosPausa * 60.0;
-    final avance = (_trabajo % total) / total;
-    final faltan = total - (_trabajo % total);
+    final avance = (_desdePausa / total).clamp(0.0, 1.0).toDouble();
+    final faltan = (total - _desdePausa).clamp(0.0, total).toDouble();
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: decoracionTarjeta(),
@@ -225,8 +258,17 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
             ),
           ),
           const SizedBox(height: 6),
-          Text('Cada ${widget.tipo.minutosPausa} min: flexión y extensión de 30°, 5 repeticiones',
+          Text('${widget.tipo.texto}: cada ${widget.tipo.minutosPausa} min, flexión y extensión de 30°',
               style: const TextStyle(color: Colores.textoSuave, fontSize: 12)),
+          // Solo con el simulado, para no esperar 45 o 60 minutos
+          if (simulado) ...[
+            const SizedBox(height: 10),
+            TextButton.icon(
+              onPressed: () => (widget.brazalete as BrazaleteSimulado).simularPausaAhora(),
+              icon: const Icon(Icons.fast_forward_rounded, size: 18),
+              label: const Text('Probar pausa ahora (simulación)'),
+            ),
+          ],
         ],
       ),
     );

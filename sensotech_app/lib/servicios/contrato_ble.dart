@@ -48,4 +48,32 @@ class ContratoBle {
   static List<int> escribirModo(ModoBrazalete modo, int? tipoTrabajo) {
     return [modo.index, tipoTrabajo ?? 255];
   }
+
+  // 0002: 8 bytes -> ejercicio en curso
+  static EjercicioEnCurso leerEjercicio(List<int> bytes) {
+    final d = ByteData.sublistView(Uint8List.fromList(bytes));
+    final t = d.getUint8(0);
+    return EjercicioEnCurso(
+      tipo: TipoEjercicio.values[t > 3 ? 3 : t],
+      objetivo: d.getInt16(1, Endian.little) / 10,
+      repeticion: d.getUint8(3),
+      repeticionesTotal: d.getUint8(4),
+      serie: d.getUint8(5),
+      seriesTotal: d.getUint8(6),
+      descanso: d.getUint8(7),
+    );
+  }
+
+  // Ejercicio -> 8 bytes (lo usa el simulado, igual que el ESP32)
+  static List<int> escribirEjercicio(EjercicioEnCurso e) {
+    final d = ByteData(8);
+    d.setUint8(0, e.tipo.index);
+    d.setInt16(1, (e.objetivo * 10).round(), Endian.little);
+    d.setUint8(3, e.repeticion);
+    d.setUint8(4, e.repeticionesTotal);
+    d.setUint8(5, e.serie);
+    d.setUint8(6, e.seriesTotal);
+    d.setUint8(7, e.descanso);
+    return d.buffer.asUint8List();
+  }
 }

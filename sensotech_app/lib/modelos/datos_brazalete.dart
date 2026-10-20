@@ -31,3 +31,43 @@ class LecturaEnVivo {
     required this.antebrazo,
   });
 }
+
+// Ejercicio de la pausa activa o la rehabilitación
+enum TipoEjercicio { flexion, extension, pulgar, menique }
+
+extension TextoEjercicio on TipoEjercicio {
+  String get texto => switch (this) {
+        TipoEjercicio.flexion => 'Flexión',
+        TipoEjercicio.extension => 'Extensión',
+        TipoEjercicio.pulgar => 'Hacia el pulgar',
+        TipoEjercicio.menique => 'Hacia el meñique',
+      };
+
+  String get instruccion => switch (this) {
+        TipoEjercicio.flexion => 'Dobla la mano hacia abajo',
+        TipoEjercicio.extension => 'Lleva la mano hacia arriba',
+        TipoEjercicio.pulgar => 'Gira la mano hacia el pulgar',
+        TipoEjercicio.menique => 'Gira la mano hacia el meñique',
+      };
+}
+
+// Ejercicio en curso (característica 0002, 8 bytes)
+class EjercicioEnCurso {
+  final TipoEjercicio tipo;
+  final double objetivo; // grados
+  final int repeticion;
+  final int repeticionesTotal;
+  final int serie;
+  final int seriesTotal;
+  final int descanso; // segundos restantes (0 = sin descanso)
+
+  const EjercicioEnCurso({
+    required this.tipo,
+    required this.objetivo,
+    required this.repeticion,
+    required this.repeticionesTotal,
+    required this.serie,
+    required this.seriesTotal,
+    required this.descanso,
+  });
+}

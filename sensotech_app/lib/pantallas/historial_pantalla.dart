@@ -207,7 +207,7 @@ class _HistorialPantallaState extends State<HistorialPantalla> {
                 const SizedBox(height: 2),
                 Text(
                   '${x.tipo.texto} · ${formatoDuracion(x.segundosTrabajo)} · '
-                  '${x.porcentajeFuera} % fuera · ${x.alertas} alertas',
+                  '${x.porcentajeFuera} % fuera · ${x.alertas} alertas · ${x.pausas} pausas',
                   style: const TextStyle(color: Colores.textoSuave, fontSize: 12),
                 ),
               ],

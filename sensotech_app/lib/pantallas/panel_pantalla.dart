@@ -42,10 +42,22 @@ class _PanelPantallaState extends State<PanelPantalla> {
     await _b.conectar();
     if (!mounted) return;
     setState(() => _conectando = false);
+
+    // Si el perfil ya tiene modo guardado, se entra directo
+    final tipo = _perfil.ultimoTipo;
+    if (_perfil.ultimoModo == ModoBrazalete.prevencion && tipo != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Prevención · ${tipo.texto} (último modo usado)'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      await _iniciarPrevencion(tipo);
+    }
   }
 
+  // Tocar la tarjeta: elegir el tipo de trabajo (hoja 1)
   Future<void> _abrirPrevencion() async {
-    // Hoja 1: en prevención se elige el tipo de trabajo
     final tipo = await showModalBottomSheet<TipoTrabajo>(
       context: context,
       backgroundColor: Colores.fondo,
@@ -53,18 +65,27 @@ class _PanelPantallaState extends State<PanelPantalla> {
       builder: (_) => _SelectorTipo(inicial: _perfil.ultimoTipo),
     );
     if (tipo == null || !mounted) return; // canceló
+    await _iniciarPrevencion(tipo);
+  }
 
-    _perfil = _perfil.conTipo(tipo);
-    await RepositorioPerfiles().guardar(_perfil); // recuerda la elección
+  Future<void> _iniciarPrevencion(TipoTrabajo tipo) async {
+    _perfil = _perfil.conModo(ModoBrazalete.prevencion, tipo: tipo);
+    await RepositorioPerfiles().guardar(_perfil); // recuerda modo y tipo
     await _b.enviarModo(ModoBrazalete.prevencion, tipoTrabajo: tipo.index);
     if (!mounted) return;
-    await Navigator.push(
+    final cambiarModo = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => PrevencionPantalla(perfil: _perfil, tipo: tipo, brazalete: _b),
       ),
     );
     await _b.enviarModo(ModoBrazalete.menu); // al volver, menú de modo
+    if (cambiarModo == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Elige el modo'), behavior: SnackBarBehavior.floating),
+      );
+    }
+    if (mounted) setState(() {});
   }
 
   @override

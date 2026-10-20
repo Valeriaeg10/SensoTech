@@ -9,6 +9,7 @@ class SesionPrevencion {
   final int segundosTrabajo;
   final int segundosFuera;
   final int alertas;
+  final int pausas; // pausas activas realizadas
   final bool completa; // false = cancelada / incompleta
 
   SesionPrevencion({
@@ -19,6 +20,7 @@ class SesionPrevencion {
     required this.segundosTrabajo,
     required this.segundosFuera,
     required this.alertas,
+    required this.pausas,
     required this.completa,
   });
 
@@ -39,6 +41,7 @@ class SesionPrevencion {
         'trabajo': segundosTrabajo,
         'fuera': segundosFuera,
         'alertas': alertas,
+        'pausas': pausas,
         'completa': completa,
       };
 
@@ -50,6 +53,7 @@ class SesionPrevencion {
         segundosTrabajo: m['trabajo'] as int,
         segundosFuera: m['fuera'] as int,
         alertas: m['alertas'] as int,
+        pausas: (m['pausas'] as int?) ?? 0, // jornadas viejas no lo tenían
         completa: m['completa'] as bool,
       );
 }
