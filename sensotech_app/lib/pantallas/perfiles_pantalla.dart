@@ -24,6 +24,7 @@ class _PerfilesPantallaState extends State<PerfilesPantalla> {
   final _repo = RepositorioPerfiles();
   List<Perfil> _perfiles = [];
   bool _cargando = true;
+  String? _error; // si falla la lectura, se muestra en pantalla
 
   @override
   void initState() {
@@ -32,12 +33,22 @@ class _PerfilesPantallaState extends State<PerfilesPantalla> {
   }
 
   Future<void> _cargar() async {
-    final perfiles = await _repo.leerTodos();
-    if (!mounted) return;
-    setState(() {
-      _perfiles = perfiles;
-      _cargando = false;
-    });
+    try {
+      // Máximo 5 s: si se traba, avisa en vez de girar para siempre
+      final perfiles = await _repo.leerTodos().timeout(const Duration(seconds: 5));
+      if (!mounted) return;
+      setState(() {
+        _perfiles = perfiles;
+        _cargando = false;
+        _error = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _cargando = false;
+        _error = e.toString();
+      });
+    }
   }
 
   Future<void> _crear() async {
@@ -126,6 +137,34 @@ class _PerfilesPantallaState extends State<PerfilesPantalla> {
   Widget _contenido() {
     if (_cargando) {
       return const Center(child: CircularProgressIndicator());
+    }
+
+    // Error al leer los perfiles guardados
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.error_outline_rounded, size: 56, color: Colores.rojo),
+            const SizedBox(height: 12),
+            const Text('No se pudieron leer los perfiles',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            SelectableText(_error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colores.textoSuave, fontSize: 12)),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() => _cargando = true);
+                _cargar();
+              },
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      );
     }
 
     // Sin perfiles: invitar a crear el primero
