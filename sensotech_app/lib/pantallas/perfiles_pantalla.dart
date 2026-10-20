@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../modelos/perfil.dart';
 import '../servicios/brazalete.dart';
 import '../servicios/repositorio_perfiles.dart';
+import '../servicios/repositorio_sesiones.dart';
 import '../tema/colores.dart';
 import '../tema/tema_app.dart';
 import '../widgets/icono_chip.dart';
@@ -63,16 +64,18 @@ class _PerfilesPantallaState extends State<PerfilesPantalla> {
     );
     if (ok != true) return;
     await _repo.borrar(p.id);
+    await RepositorioSesiones().borrarDePerfil(p.id);
     await _cargar();
   }
 
-  void _abrir(Perfil p) {
-    Navigator.push(
+  Future<void> _abrir(Perfil p) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => PanelPantalla(perfil: p, brazalete: widget.brazalete),
       ),
     );
+    await _cargar(); // por si cambió el último tipo de trabajo
   }
 
   @override
@@ -177,9 +180,9 @@ class _PerfilesPantallaState extends State<PerfilesPantalla> {
                           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
                       Row(
                         children: [
-                          const Icon(Icons.work_outline_rounded, size: 14, color: Colores.textoSuave),
+                          const Icon(Icons.event_rounded, size: 14, color: Colores.textoSuave),
                           const SizedBox(width: 4),
-                          Text('Trabajo ${p.tipoTexto.toLowerCase()}',
+                          Text('Creado el ${p.fechaTexto}',
                               style: const TextStyle(color: Colores.textoSuave)),
                         ],
                       ),

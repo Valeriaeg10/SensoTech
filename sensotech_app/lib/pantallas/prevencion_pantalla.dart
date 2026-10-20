@@ -2,7 +2,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../modelos/datos_brazalete.dart';
 import '../modelos/perfil.dart';
+import '../modelos/sesion.dart';
 import '../servicios/brazalete.dart';
+import '../servicios/repositorio_sesiones.dart';
 import '../tema/colores.dart';
 import '../tema/tema_app.dart';
 import '../widgets/icono_chip.dart';
@@ -12,9 +14,15 @@ import '../widgets/tarjeta_movimiento.dart';
 // Modo prevención (hoja 2): postura en vivo, contadores y pausa activa
 class PrevencionPantalla extends StatefulWidget {
   final Perfil perfil;
+  final TipoTrabajo tipo;
   final Brazalete brazalete;
 
-  const PrevencionPantalla({super.key, required this.perfil, required this.brazalete});
+  const PrevencionPantalla({
+    super.key,
+    required this.perfil,
+    required this.tipo,
+    required this.brazalete,
+  });
 
   @override
   State<PrevencionPantalla> createState() => _PrevencionPantallaState();
@@ -28,6 +36,8 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
   double _trabajo = 0;
   double _fueraDeRango = 0;
   int _alertas = 0;
+  bool _guardada = false;
+  final DateTime _inicio = DateTime.now();
 
   @override
   void initState() {
@@ -38,7 +48,24 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
   @override
   void dispose() {
     _sub?.cancel();
+    // Salió sin terminar: se guarda como incompleta (hoja 1)
+    if (!_guardada && _trabajo >= 1) _guardar(completa: false);
     super.dispose();
+  }
+
+  // Guarda la jornada en el historial del perfil
+  Future<void> _guardar({required bool completa}) {
+    _guardada = true;
+    return RepositorioSesiones().guardar(SesionPrevencion(
+      id: _inicio.millisecondsSinceEpoch.toString(),
+      perfilId: widget.perfil.id,
+      fecha: _inicio,
+      tipo: widget.tipo,
+      segundosTrabajo: _trabajo.round(),
+      segundosFuera: _fueraDeRango.round(),
+      alertas: _alertas,
+      completa: completa,
+    ));
   }
 
   // Cada lectura equivale a 0,1 s
@@ -64,6 +91,8 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
   }
 
   Future<void> _terminar() async {
+    await _guardar(completa: true);
+    if (!mounted) return;
     final porcentaje = _trabajo == 0 ? 0 : (_fueraDeRango / _trabajo * 100).round();
     await showDialog<void>(
       context: context,
@@ -76,6 +105,9 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
             _filaResumen('Tiempo de trabajo', _formato(_trabajo)),
             _filaResumen('Fuera de rango', '${_formato(_fueraDeRango)} ($porcentaje %)'),
             _filaResumen('Alertas', '$_alertas'),
+            const SizedBox(height: 8),
+            const Text('Guardado en el historial',
+                style: TextStyle(color: Colores.verde, fontSize: 12, fontWeight: FontWeight.w600)),
           ],
         ),
         actions: [
@@ -109,7 +141,7 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
             padding: const EdgeInsets.only(right: 16),
             child: Chip(
               avatar: const Icon(Icons.work_outline_rounded, size: 18, color: Colores.primario),
-              label: Text(widget.perfil.tipoTexto),
+              label: Text(widget.tipo.texto),
               backgroundColor: Colores.azulSuave,
               side: BorderSide.none,
             ),
@@ -161,7 +193,7 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
 
   // Cuenta regresiva para la pausa activa
   Widget _tarjetaPausa() {
-    final total = widget.perfil.minutosPausa * 60.0;
+    final total = widget.tipo.minutosPausa * 60.0;
     final avance = (_trabajo % total) / total;
     final faltan = total - (_trabajo % total);
     return Container(
@@ -193,7 +225,7 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
             ),
           ),
           const SizedBox(height: 6),
-          Text('Cada ${widget.perfil.minutosPausa} min: flexión y extensión de 30°, 5 repeticiones',
+          Text('Cada ${widget.tipo.minutosPausa} min: flexión y extensión de 30°, 5 repeticiones',
               style: const TextStyle(color: Colores.textoSuave, fontSize: 12)),
         ],
       ),

@@ -1,40 +1,50 @@
-// Tipo de trabajo del usuario (define la pausa activa)
+// Tipo de trabajo (solo para el modo prevención)
 enum TipoTrabajo { administrativo, repetitivo }
+
+extension TextoTipoTrabajo on TipoTrabajo {
+  String get texto => this == TipoTrabajo.administrativo ? 'Administrativo' : 'Repetitivo';
+
+  // Minutos entre pausas activas (hoja 2)
+  int get minutosPausa => this == TipoTrabajo.administrativo ? 60 : 45;
+}
 
 // Perfil guardado en el celular
 class Perfil {
   final String id;
   final String nombre;
-  final TipoTrabajo tipoTrabajo;
   final DateTime creado;
+  final TipoTrabajo? ultimoTipo; // se recuerda para la próxima jornada
 
   Perfil({
     required this.id,
     required this.nombre,
-    required this.tipoTrabajo,
     required this.creado,
+    this.ultimoTipo,
   });
 
-  // Texto para mostrar
-  String get tipoTexto =>
-      tipoTrabajo == TipoTrabajo.administrativo ? 'Administrativo' : 'Repetitivo';
+  // Copia con el tipo de trabajo actualizado
+  Perfil conTipo(TipoTrabajo tipo) =>
+      Perfil(id: id, nombre: nombre, creado: creado, ultimoTipo: tipo);
 
-  // Minutos entre pausas activas (hoja 2)
-  int get minutosPausa => tipoTrabajo == TipoTrabajo.administrativo ? 60 : 45;
+  String get fechaTexto =>
+      '${creado.day.toString().padLeft(2, '0')}/${creado.month.toString().padLeft(2, '0')}/${creado.year}';
 
   // Perfil -> mapa (para guardar)
   Map<String, dynamic> aMapa() => {
         'id': id,
         'nombre': nombre,
-        'tipo': tipoTrabajo.index,
         'creado': creado.toIso8601String(),
+        'tipo': ultimoTipo?.index,
       };
 
   // Mapa -> perfil (al leer)
-  factory Perfil.desdeMapa(Map<String, dynamic> m) => Perfil(
-        id: m['id'] as String,
-        nombre: m['nombre'] as String,
-        tipoTrabajo: TipoTrabajo.values[m['tipo'] as int],
-        creado: DateTime.parse(m['creado'] as String),
-      );
+  factory Perfil.desdeMapa(Map<String, dynamic> m) {
+    final tipo = m['tipo'] as int?;
+    return Perfil(
+      id: m['id'] as String,
+      nombre: m['nombre'] as String,
+      creado: DateTime.parse(m['creado'] as String),
+      ultimoTipo: tipo == null ? null : TipoTrabajo.values[tipo],
+    );
+  }
 }

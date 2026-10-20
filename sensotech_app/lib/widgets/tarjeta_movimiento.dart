@@ -18,6 +18,14 @@ class TarjetaMovimiento extends StatefulWidget {
 
 class _TarjetaMovimientoState extends State<TarjetaMovimiento> {
   TipoVista _vista = TipoVista.lateral;
+  final List<LecturaEnVivo> _estela = []; // últimos 2 s
+
+  @override
+  void didUpdateWidget(TarjetaMovimiento old) {
+    super.didUpdateWidget(old);
+    _estela.add(widget.lectura);
+    if (_estela.length > 20) _estela.removeAt(0); // 20 lecturas = 2 s
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,9 +79,8 @@ class _TarjetaMovimientoState extends State<TarjetaMovimiento> {
           const SizedBox(height: 12),
           VistaBrazo(
             vista: _vista,
-            flexion: l.flexion,
-            desviacion: l.desviacion,
-            antebrazo: l.antebrazo,
+            lectura: l,
+            estela: _estela,
             colorEstado: colorDeEstado(l.estado),
           ),
           const SizedBox(height: 10),
@@ -85,6 +92,7 @@ class _TarjetaMovimientoState extends State<TarjetaMovimiento> {
               if (lateral) const _ItemLeyenda(numero: '1', texto: 'IMU antebrazo'),
               const _ItemLeyenda(numero: '2', texto: 'IMU mano'),
               const _ItemLeyenda(texto: 'Mano recta', punteada: true),
+              const _ItemLeyenda(texto: 'Trayectoria (2 s)', estela: true),
             ],
           ),
         ],
@@ -97,12 +105,22 @@ class _ItemLeyenda extends StatelessWidget {
   final String? numero;
   final String texto;
   final bool punteada;
+  final bool estela;
 
-  const _ItemLeyenda({this.numero, required this.texto, this.punteada = false});
+  const _ItemLeyenda({this.numero, required this.texto, this.punteada = false, this.estela = false});
 
   @override
   Widget build(BuildContext context) {
-    final Widget marca = punteada
+    final Widget marca = estela
+        ? Container(
+            width: 18,
+            height: 3,
+            decoration: BoxDecoration(
+              color: Colores.primario.withValues(alpha: 0.6),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          )
+        : punteada
         ? const Text('- - -', style: TextStyle(color: Colores.textoSuave, fontWeight: FontWeight.w700))
         : Container(
             width: 18,
