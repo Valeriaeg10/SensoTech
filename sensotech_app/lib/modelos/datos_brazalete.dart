@@ -12,6 +12,9 @@ enum FaseBrazalete {
   evaluacion,
 }
 
+// Modo del brazalete (característica 0003, byte 0)
+enum ModoBrazalete { menu, prevencion, rehabilitacion }
+
 // Una lectura en vivo (llega 10 veces por segundo)
 class LecturaEnVivo {
   final double flexion; // mano − antebrazo: + flexión, − extensión

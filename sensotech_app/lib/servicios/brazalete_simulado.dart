@@ -34,6 +34,15 @@ class BrazaleteSimulado implements Brazalete {
     _timer = Timer.periodic(const Duration(milliseconds: 100), (_) => _tick());
   }
 
+  ModoBrazalete _modo = ModoBrazalete.menu;
+  ModoBrazalete get modo => _modo;
+
+  @override
+  Future<void> enviarModo(ModoBrazalete modo, {int? tipoTrabajo}) async {
+    ContratoBle.escribirModo(modo, tipoTrabajo); // mismos bytes que iría al ESP32
+    _modo = modo;
+  }
+
   @override
   Future<void> desconectar() async {
     _timer?.cancel();

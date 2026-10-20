@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../modelos/datos_brazalete.dart';
 import '../modelos/perfil.dart';
@@ -6,10 +5,9 @@ import '../servicios/brazalete.dart';
 import '../tema/colores.dart';
 import '../tema/tema_app.dart';
 import '../widgets/icono_chip.dart';
-import '../widgets/indicador_estado.dart';
-import '../widgets/vista_brazo.dart';
+import 'prevencion_pantalla.dart';
 
-// Panel principal: conexión, estado y brazo en tiempo real
+// Panel: conectar el brazalete y elegir el modo (hoja 1)
 class PanelPantalla extends StatefulWidget {
   final Perfil perfil;
   final Brazalete brazalete;
@@ -21,30 +19,20 @@ class PanelPantalla extends StatefulWidget {
 }
 
 class _PanelPantallaState extends State<PanelPantalla> {
-  StreamSubscription<LecturaEnVivo>? _sub;
-  LecturaEnVivo? _ultima;
   bool _conectando = false;
 
   Brazalete get _b => widget.brazalete;
 
   @override
-  void initState() {
-    super.initState();
-    // Escucha las lecturas mientras esta pantalla esté abierta
-    _sub = _b.lecturas.listen((l) => setState(() => _ultima = l));
-  }
-
-  @override
   void dispose() {
-    _sub?.cancel();
-    _b.desconectar();
+    _b.desconectar(); // al salir del perfil se desconecta
     super.dispose();
   }
 
   Future<void> _alternarConexion() async {
     if (_b.conectado) {
       await _b.desconectar();
-      setState(() => _ultima = null);
+      setState(() {});
       return;
     }
     setState(() => _conectando = true);
@@ -53,60 +41,52 @@ class _PanelPantallaState extends State<PanelPantalla> {
     setState(() => _conectando = false);
   }
 
+  Future<void> _abrirPrevencion() async {
+    await _b.enviarModo(ModoBrazalete.prevencion, tipoTrabajo: widget.perfil.tipoTrabajo.index);
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PrevencionPantalla(perfil: widget.perfil, brazalete: _b),
+      ),
+    );
+    await _b.enviarModo(ModoBrazalete.menu); // al volver, menú de modo
+  }
+
   @override
   Widget build(BuildContext context) {
-    final l = _ultima;
+    final conectado = _b.conectado;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.perfil.nombre),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Chip(
-              avatar: const Icon(Icons.work_outline, size: 18, color: Colores.primario),
-              label: Text(widget.perfil.tipoTexto),
-              backgroundColor: Colores.azulSuave,
-              side: BorderSide.none,
-            ),
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text(widget.perfil.nombre)),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             _tarjetaConexion(),
-            const SizedBox(height: 16),
-            if (_b.conectado && l != null) ...[
-              IndicadorEstado(estado: l.estado),
-              const SizedBox(height: 16),
-              _tarjetaVista(
-                icono: Icons.swap_vert_rounded,
-                titulo: 'Vista lateral',
-                detalle: 'Flexión y extensión',
-                vista: TipoVista.lateral,
-                l: l,
-              ),
-              const SizedBox(height: 16),
-              _tarjetaVista(
-                icono: Icons.swap_horiz_rounded,
-                titulo: 'Vista superior',
-                detalle: 'Hacia el pulgar o el meñique',
-                vista: TipoVista.superior,
-                l: l,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(child: _tarjetaAngulo(Icons.pan_tool_alt_outlined, 'Flexión', l.flexion)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _tarjetaAngulo(Icons.open_with_rounded, 'Desviación', l.desviacion)),
-                  const SizedBox(width: 10),
-                  Expanded(child: _tarjetaAngulo(Icons.straighten_rounded, 'Antebrazo', l.antebrazo)),
-                ],
-              ),
-            ] else
-              _mensajeSinConexion(),
+            const SizedBox(height: 24),
+            const Text('Elige el modo',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text(conectado ? 'También se puede elegir con el botón del brazalete' : 'Conecta el brazalete primero',
+                style: const TextStyle(color: Colores.textoSuave, fontSize: 13)),
+            const SizedBox(height: 14),
+            _tarjetaModo(
+              icono: Icons.shield_outlined,
+              titulo: 'Prevención',
+              detalle: 'Vigila la postura en la jornada y avisa la pausa activa cada '
+                  '${widget.perfil.minutosPausa} min',
+              activo: conectado,
+              alTocar: _abrirPrevencion,
+            ),
+            const SizedBox(height: 12),
+            _tarjetaModo(
+              icono: Icons.fitness_center_rounded,
+              titulo: 'Rehabilitación',
+              detalle: 'Rutina guiada, línea base y evaluación de progreso',
+              activo: false,
+              etiqueta: 'Próximamente',
+              alTocar: () {},
+            ),
           ],
         ),
       ),
@@ -132,7 +112,7 @@ class _PanelPantallaState extends State<PanelPantalla> {
                   children: [
                     Text(conectado ? _b.nombre : 'Brazalete desconectado',
                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                    Text(conectado ? 'Recibiendo datos' : 'Toca conectar para empezar',
+                    Text(conectado ? 'Conectado' : 'Toca conectar para empezar',
                         style: const TextStyle(color: Colores.textoSuave, fontSize: 13)),
                   ],
                 ),
@@ -167,76 +147,56 @@ class _PanelPantallaState extends State<PanelPantalla> {
     );
   }
 
-  Widget _tarjetaVista({
+  Widget _tarjetaModo({
     required IconData icono,
     required String titulo,
     required String detalle,
-    required TipoVista vista,
-    required LecturaEnVivo l,
+    required bool activo,
+    required VoidCallback alTocar,
+    String? etiqueta,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: decoracionTarjeta(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Opacity(
+      opacity: activo ? 1 : 0.55,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: activo ? alTocar : null,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: decoracionTarjeta(),
+          child: Row(
             children: [
-              IconoChip(icono: icono, tamano: 34),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(titulo, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  Text(detalle, style: const TextStyle(color: Colores.textoSuave, fontSize: 12)),
-                ],
+              IconoChip(icono: icono, tamano: 48),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(titulo, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                        if (etiqueta != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colores.azulSuave,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(etiqueta,
+                                style: const TextStyle(fontSize: 11, color: Colores.primario)),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(detalle, style: const TextStyle(color: Colores.textoSuave, fontSize: 13)),
+                  ],
+                ),
               ),
+              const Icon(Icons.chevron_right_rounded, color: Colores.textoSuave),
             ],
           ),
-          const SizedBox(height: 12),
-          VistaBrazo(
-            vista: vista,
-            flexion: l.flexion,
-            desviacion: l.desviacion,
-            antebrazo: l.antebrazo,
-            colorEstado: colorDeEstado(l.estado),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _tarjetaAngulo(IconData icono, String titulo, double valor) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: decoracionTarjeta(),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icono, size: 20, color: Colores.primario),
-          const SizedBox(height: 8),
-          Text(titulo, style: const TextStyle(color: Colores.textoSuave, fontSize: 12)),
-          Text('${valor.toStringAsFixed(1)}°',
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
-
-  Widget _mensajeSinConexion() {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: decoracionTarjeta(),
-      child: const Column(
-        children: [
-          IconoChip(icono: Icons.watch_rounded, tamano: 64),
-          SizedBox(height: 14),
-          Text('Sin brazalete conectado',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-          SizedBox(height: 4),
-          Text('Conéctalo para ver el brazo y la mano en tiempo real',
-              textAlign: TextAlign.center, style: TextStyle(color: Colores.textoSuave)),
-        ],
+        ),
       ),
     );
   }

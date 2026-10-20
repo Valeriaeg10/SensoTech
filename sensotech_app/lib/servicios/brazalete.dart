@@ -11,4 +11,7 @@ abstract class Brazalete {
 
   Future<void> conectar();
   Future<void> desconectar();
+
+  // Envía el modo elegido (característica 0003)
+  Future<void> enviarModo(ModoBrazalete modo, {int? tipoTrabajo});
 }

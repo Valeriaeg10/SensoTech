@@ -5,6 +5,7 @@ import '../servicios/repositorio_perfiles.dart';
 import '../tema/colores.dart';
 import '../tema/tema_app.dart';
 import '../widgets/icono_chip.dart';
+import '../widgets/logo.dart';
 import 'crear_perfil_pantalla.dart';
 import 'panel_pantalla.dart';
 
@@ -83,26 +84,24 @@ class _PerfilesPantallaState extends State<PerfilesPantalla> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Encabezado con logo
-              const Row(
+              const LogoSensoTech(),
+              const SizedBox(height: 28),
+              Row(
                 children: [
-                  IconoChip(icono: Icons.health_and_safety_rounded, tamano: 48),
-                  SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('SensoTech',
-                          style: TextStyle(
-                              fontSize: 24, fontWeight: FontWeight.w800, color: Colores.primarioOscuro)),
-                      Text('Prevención y rehabilitación del STC',
-                          style: TextStyle(fontSize: 13, color: Colores.textoSuave)),
-                    ],
-                  ),
+                  const Text('Perfiles', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                  const SizedBox(width: 8),
+                  if (_perfiles.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colores.azulSuave,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text('${_perfiles.length}',
+                          style: const TextStyle(color: Colores.primario, fontWeight: FontWeight.w700)),
+                    ),
                 ],
               ),
-              const SizedBox(height: 28),
-              const Text('¿Quién va a usar el brazalete?',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
               const SizedBox(height: 14),
               Expanded(child: _contenido()),
             ],

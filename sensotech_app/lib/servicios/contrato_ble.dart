@@ -43,4 +43,9 @@ class ContratoBle {
     d.setInt16(6, (l.antebrazo * 10).round(), Endian.little);
     return d.buffer.asUint8List();
   }
+
+  // 0003: modo + tipo de trabajo (255 = sin elegir)
+  static List<int> escribirModo(ModoBrazalete modo, int? tipoTrabajo) {
+    return [modo.index, tipoTrabajo ?? 255];
+  }
 }
