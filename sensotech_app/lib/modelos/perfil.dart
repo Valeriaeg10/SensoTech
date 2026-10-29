@@ -10,6 +10,9 @@ extension TextoTipoTrabajo on TipoTrabajo {
   int get minutosPausa => this == TipoTrabajo.administrativo ? 60 : 45;
 }
 
+// Mano donde se usa el brazalete
+enum Mano { derecha, izquierda }
+
 // Perfil guardado en el celular
 class Perfil {
   final String id;
@@ -17,6 +20,7 @@ class Perfil {
   final DateTime creado;
   final TipoTrabajo? ultimoTipo; // se recuerda para la próxima jornada
   final ModoBrazalete? ultimoModo; // al conectar se entra directo a este modo
+  final Mano? mano; // null = aún no la eligió
 
   Perfil({
     required this.id,
@@ -24,7 +28,18 @@ class Perfil {
     required this.creado,
     this.ultimoTipo,
     this.ultimoModo,
+    this.mano,
   });
+
+  // Copia con la mano elegida
+  Perfil conMano(Mano m) => Perfil(
+        id: id,
+        nombre: nombre,
+        creado: creado,
+        ultimoModo: ultimoModo,
+        ultimoTipo: ultimoTipo,
+        mano: m,
+      );
 
   // Copia con el modo y tipo de trabajo actualizados
   Perfil conModo(ModoBrazalete modo, {TipoTrabajo? tipo}) => Perfil(
@@ -33,6 +48,7 @@ class Perfil {
         creado: creado,
         ultimoModo: modo,
         ultimoTipo: tipo ?? ultimoTipo,
+        mano: mano,
       );
 
   String get fechaTexto =>
@@ -45,12 +61,14 @@ class Perfil {
         'creado': creado.toIso8601String(),
         'tipo': ultimoTipo?.index,
         'modo': ultimoModo?.index,
+        'mano': mano?.index,
       };
 
   // Mapa -> perfil (al leer)
   factory Perfil.desdeMapa(Map<String, dynamic> m) {
     final tipo = m['tipo'] as int?;
     final modo = m['modo'] as int?;
+    final mano = m['mano'] as int?;
     return Perfil(
       id: m['id'] as String,
       nombre: m['nombre'] as String,
@@ -60,6 +78,7 @@ class Perfil {
       ultimoModo: modo != null
           ? ModoBrazalete.values[modo]
           : (tipo != null ? ModoBrazalete.prevencion : null),
+      mano: mano == null ? null : Mano.values[mano],
     );
   }
 }

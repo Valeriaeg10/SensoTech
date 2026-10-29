@@ -1,17 +1,19 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../modelos/datos_brazalete.dart';
+import '../modelos/ejercicios.dart';
 import '../modelos/perfil.dart';
 import '../modelos/sesion.dart';
 import '../servicios/brazalete.dart';
 import '../servicios/brazalete_simulado.dart';
+import '../servicios/repositorio_perfiles.dart';
 import '../servicios/repositorio_sesiones.dart';
 import '../tema/colores.dart';
 import '../tema/tema_app.dart';
 import '../widgets/icono_chip.dart';
 import '../widgets/indicador_estado.dart';
 import '../widgets/tarjeta_movimiento.dart';
-import '../widgets/tarjeta_pausa_activa.dart';
+import '../widgets/tarjeta_ejercicio_guiado.dart';
 
 // Modo prevención (hoja 2): postura en vivo, contadores y pausa activa
 class PrevencionPantalla extends StatefulWidget {
@@ -45,7 +47,16 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
   bool _guardada = false;
   final DateTime _inicio = DateTime.now();
 
-  bool get _enPausa => _ultima?.fase == FaseBrazalete.pausaActiva;
+  static bool _esPausa(LecturaEnVivo? l) =>
+      l?.fase == FaseBrazalete.pausaActiva || l?.fase == FaseBrazalete.descanso;
+  bool get _enPausa => _esPausa(_ultima);
+
+  late Perfil _perfil = widget.perfil; // guarda la mano elegida
+
+  Future<void> _elegirMano(Mano m) async {
+    setState(() => _perfil = _perfil.conMano(m));
+    await RepositorioPerfiles().guardar(_perfil);
+  }
 
   @override
   void initState() {
@@ -68,15 +79,15 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
     final antes = _ultima;
     setState(() {
       _trabajo += 0.1;
-      if (l.fase == FaseBrazalete.pausaActiva) {
+      if (_esPausa(l)) {
         // Empezó la pausa
-        if (antes?.fase != FaseBrazalete.pausaActiva) _avisar('Hora de la pausa activa');
+        if (!_esPausa(antes)) _avisar('Hora de la pausa activa');
       } else {
         _desdePausa += 0.1;
         if (l.estado != EstadoPostura.verde) _fueraDeRango += 0.1;
         if (l.estado == EstadoPostura.rojo && antes?.estado != EstadoPostura.rojo) _alertas++;
         // Terminó la pausa: contarla y reiniciar el tiempo de trabajo
-        if (antes?.fase == FaseBrazalete.pausaActiva) {
+        if (_esPausa(antes)) {
           _pausas++;
           _desdePausa = 0;
           _ejercicio = null;
@@ -184,24 +195,37 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
                 children: [
                   // Durante la pausa se muestra el ejercicio guiado
                   if (_enPausa && e != null)
-                    TarjetaPausaActiva(ejercicio: e, lectura: l)
+                    TarjetaEjercicioGuiado(
+                      ejercicio: e,
+                      lectura: l,
+                      izquierda: _perfil.mano == Mano.izquierda,
+                      etiqueta: 'Pausa activa',
+                      posicion: 'Ejercicio ${e.codigo - IdEjercicio.p1Bombeo.index + 1} de 3',
+                    )
                   else ...[
                     IndicadorEstado(estado: l.estado),
                     const SizedBox(height: 16),
                     _tarjetaPausa(simulado),
                   ],
-                  const SizedBox(height: 16),
-                  TarjetaMovimiento(lectura: l),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(child: _dato(Icons.pan_tool_alt_outlined, 'Flexión', '${l.flexion.toStringAsFixed(1)}°')),
-                      const SizedBox(width: 10),
-                      Expanded(child: _dato(Icons.open_with_rounded, 'Desviación', '${l.desviacion.toStringAsFixed(1)}°')),
-                      const SizedBox(width: 10),
-                      Expanded(child: _dato(Icons.straighten_rounded, 'Antebrazo', '${l.antebrazo.toStringAsFixed(1)}°')),
-                    ],
-                  ),
+                  // En la pausa la tarjeta guiada ya trae la muñeca en vivo: no se repite
+                  if (!_enPausa) ...[
+                    const SizedBox(height: 16),
+                    TarjetaMovimiento(
+                      lectura: l,
+                      mano: _perfil.mano,
+                      alElegirMano: _elegirMano,
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(child: _dato(Icons.pan_tool_alt_outlined, 'Flexión', '${l.flexion.toStringAsFixed(1)}°')),
+                        const SizedBox(width: 10),
+                        Expanded(child: _dato(Icons.open_with_rounded, 'Desviación', '${l.desviacion.toStringAsFixed(1)}°')),
+                        const SizedBox(width: 10),
+                        Expanded(child: _dato(Icons.straighten_rounded, 'Antebrazo', '${l.antebrazo.toStringAsFixed(1)}°')),
+                      ],
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   Row(
                     children: [
@@ -258,7 +282,8 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
             ),
           ),
           const SizedBox(height: 6),
-          Text('${widget.tipo.texto}: cada ${widget.tipo.minutosPausa} min, flexión y extensión de 30°',
+          Text('${widget.tipo.texto}: cada ${widget.tipo.minutosPausa} min. Bombeo de flexoextensión, '
+              'isométrico en extensión y activación de dedos.',
               style: const TextStyle(color: Colores.textoSuave, fontSize: 12)),
           // Solo con el simulado, para no esperar 45 o 60 minutos
           if (simulado) ...[

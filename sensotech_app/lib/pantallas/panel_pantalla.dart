@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../modelos/cuenta.dart';
 import '../modelos/datos_brazalete.dart';
 import '../modelos/perfil.dart';
 import '../servicios/brazalete.dart';
@@ -6,15 +7,19 @@ import '../servicios/repositorio_perfiles.dart';
 import '../tema/colores.dart';
 import '../tema/tema_app.dart';
 import '../widgets/icono_chip.dart';
+import 'arranque.dart';
 import 'historial_pantalla.dart';
+import 'mi_fisio.dart';
 import 'prevencion_pantalla.dart';
+import 'rehabilitacion_pantalla.dart';
 
 // Panel: conectar el brazalete y elegir el modo (hoja 1)
 class PanelPantalla extends StatefulWidget {
   final Perfil perfil;
+  final Cuenta cuenta;
   final Brazalete brazalete;
 
-  const PanelPantalla({super.key, required this.perfil, required this.brazalete});
+  const PanelPantalla({super.key, required this.perfil, required this.cuenta, required this.brazalete});
 
   @override
   State<PanelPantalla> createState() => _PanelPantallaState();
@@ -43,7 +48,12 @@ class _PanelPantallaState extends State<PanelPantalla> {
     if (!mounted) return;
     setState(() => _conectando = false);
 
-    // Si el perfil ya tiene modo guardado, se entra directo
+    // Paciente del fisio: entra directo a rehabilitación
+    if (widget.cuenta.esRehabilitacion) {
+      await _iniciarRehabilitacion();
+      return;
+    }
+    // Prevención: si ya tiene tipo de trabajo guardado, se entra directo
     final tipo = _perfil.ultimoTipo;
     if (_perfil.ultimoModo == ModoBrazalete.prevencion && tipo != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -54,6 +64,24 @@ class _PanelPantallaState extends State<PanelPantalla> {
       );
       await _iniciarPrevencion(tipo);
     }
+  }
+
+  Future<void> _iniciarRehabilitacion() async {
+    for (final x in await RepositorioPerfiles().leerTodos()) {
+      if (x.id == _perfil.id) _perfil = x;
+    }
+    _perfil = _perfil.conModo(ModoBrazalete.rehabilitacion);
+    await RepositorioPerfiles().guardar(_perfil);
+    await _b.enviarModo(ModoBrazalete.rehabilitacion);
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RehabilitacionPantalla(perfil: _perfil, cuenta: widget.cuenta, brazalete: _b),
+      ),
+    );
+    await _b.enviarModo(ModoBrazalete.menu);
+    if (mounted) setState(() {});
   }
 
   // Tocar la tarjeta: elegir el tipo de trabajo (hoja 1)
@@ -69,6 +97,10 @@ class _PanelPantallaState extends State<PanelPantalla> {
   }
 
   Future<void> _iniciarPrevencion(TipoTrabajo tipo) async {
+    // Perfil guardado al día (por si cambió la mano)
+    for (final x in await RepositorioPerfiles().leerTodos()) {
+      if (x.id == _perfil.id) _perfil = x;
+    }
     _perfil = _perfil.conModo(ModoBrazalete.prevencion, tipo: tipo);
     await RepositorioPerfiles().guardar(_perfil); // recuerda modo y tipo
     await _b.enviarModo(ModoBrazalete.prevencion, tipoTrabajo: tipo.index);
@@ -91,49 +123,65 @@ class _PanelPantallaState extends State<PanelPantalla> {
   @override
   Widget build(BuildContext context) {
     final conectado = _b.conectado;
+    final rehab = widget.cuenta.esRehabilitacion;
     return Scaffold(
-      appBar: AppBar(title: Text(_perfil.nombre)),
+      appBar: AppBar(
+        title: Text('Hola, ${widget.cuenta.nombre.split(' ').first}'),
+        actions: [
+          IconButton(
+            tooltip: 'Cerrar sesión',
+            icon: const Icon(Icons.logout_rounded),
+            onPressed: () => cerrarSesion(context),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             _tarjetaConexion(),
             const SizedBox(height: 24),
-            const Text('Elige el modo',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            Text(rehab ? 'Mi rehabilitación' : 'Mi prevención',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 4),
-            Text(conectado ? 'También se puede elegir con el botón del brazalete' : 'Conecta el brazalete primero',
+            Text(conectado ? 'Toca para empezar' : 'Conecta el brazalete primero',
                 style: const TextStyle(color: Colores.textoSuave, fontSize: 13)),
             const SizedBox(height: 14),
-            _tarjetaModo(
-              icono: Icons.shield_outlined,
-              titulo: 'Prevención',
-              detalle: 'Vigila la postura en la jornada y avisa la pausa activa',
-              activo: conectado,
-              alTocar: _abrirPrevencion,
-            ),
-            const SizedBox(height: 12),
-            _tarjetaModo(
-              icono: Icons.fitness_center_rounded,
-              titulo: 'Rehabilitación',
-              detalle: 'Rutina guiada, línea base y evaluación de progreso',
-              activo: false,
-              etiqueta: 'Próximamente',
-              alTocar: () {},
-            ),
+            if (rehab)
+              _tarjetaModo(
+                icono: Icons.fitness_center_rounded,
+                titulo: 'Rehabilitación',
+                detalle: 'Encuesta de dolor, rutina guiada y evaluación del rango articular',
+                activo: conectado,
+                alTocar: _iniciarRehabilitacion,
+              )
+            else
+              _tarjetaModo(
+                icono: Icons.shield_outlined,
+                titulo: 'Prevención',
+                detalle: 'Vigila la postura en la jornada y avisa la pausa activa',
+                activo: conectado,
+                alTocar: _abrirPrevencion,
+              ),
             const SizedBox(height: 24),
             const Text('Progreso', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             const SizedBox(height: 14),
             _tarjetaModo(
               icono: Icons.insert_chart_outlined_rounded,
               titulo: 'Historial',
-              detalle: 'Jornadas guardadas y gráfica de progreso',
+              detalle: rehab ? 'Sesiones, rango articular y dolor' : 'Jornadas guardadas y tiempo fuera de rango',
               activo: true,
               alTocar: () => Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => HistorialPantalla(perfil: _perfil)),
+                MaterialPageRoute(builder: (_) => HistorialPantalla(perfil: _perfil, cuenta: widget.cuenta)),
               ),
             ),
+            if (rehab) ...[
+              const SizedBox(height: 24),
+              const Text('Mi fisioterapeuta', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 14),
+              TarjetaMiFisio(paciente: widget.cuenta),
+            ],
           ],
         ),
       ),

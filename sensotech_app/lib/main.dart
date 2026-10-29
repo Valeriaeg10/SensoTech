@@ -1,21 +1,13 @@
 import 'package:flutter/material.dart';
-import 'pantallas/perfiles_pantalla.dart';
-import 'servicios/brazalete.dart';
-import 'servicios/brazalete_simulado.dart';
+import 'pantallas/arranque.dart';
 import 'tema/tema_app.dart';
 
-// Interruptor: true = datos falsos, false = brazalete real (más adelante)
-const usarSimulado = true;
-
 void main() {
-  final Brazalete brazalete = BrazaleteSimulado(); // luego: usarSimulado ? ... : BrazaleteReal()
-  runApp(SensoTechApp(brazalete: brazalete));
+  runApp(const SensoTechApp());
 }
 
 class SensoTechApp extends StatelessWidget {
-  final Brazalete brazalete;
-
-  const SensoTechApp({super.key, required this.brazalete});
+  const SensoTechApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -23,7 +15,7 @@ class SensoTechApp extends StatelessWidget {
       title: 'SensoTech',
       debugShowCheckedModeBanner: false, // quita la cinta "DEBUG"
       theme: temaApp(),
-      home: PerfilesPantalla(brazalete: brazalete),
+      home: const Arranque(), // login o inicio según la sesión
     );
   }
 }
