@@ -7,6 +7,7 @@ import '../servicios/repositorio_perfiles.dart';
 import '../tema/colores.dart';
 import '../tema/tema_app.dart';
 import '../widgets/icono_chip.dart';
+import 'agenda_pantalla.dart';
 import 'arranque.dart';
 import 'historial_pantalla.dart';
 import 'mi_fisio.dart';
@@ -27,6 +28,7 @@ class PanelPantalla extends StatefulWidget {
 
 class _PanelPantallaState extends State<PanelPantalla> {
   bool _conectando = false;
+  int _refrescar = 0; // recarga la próxima sesión al volver de rehabilitación
   late Perfil _perfil = widget.perfil; // se actualiza con el último tipo de trabajo
 
   Brazalete get _b => widget.brazalete;
@@ -81,7 +83,7 @@ class _PanelPantallaState extends State<PanelPantalla> {
       ),
     );
     await _b.enviarModo(ModoBrazalete.menu);
-    if (mounted) setState(() {});
+    if (mounted) setState(() => _refrescar++);
   }
 
   // Tocar la tarjeta: elegir el tipo de trabajo (hoja 1)
@@ -139,6 +141,10 @@ class _PanelPantallaState extends State<PanelPantalla> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
+            if (rehab) ...[
+              TarjetaProximaSesion(key: ValueKey(_refrescar), paciente: widget.cuenta),
+              const SizedBox(height: 14),
+            ],
             _tarjetaConexion(),
             const SizedBox(height: 24),
             Text(rehab ? 'Mi rehabilitación' : 'Mi prevención',

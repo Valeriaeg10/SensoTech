@@ -21,6 +21,7 @@ class _CambiarClavePantallaState extends State<CambiarClavePantalla> {
   final _clave = TextEditingController();
   final _clave2 = TextEditingController();
   bool _guardando = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -31,8 +32,20 @@ class _CambiarClavePantallaState extends State<CambiarClavePantalla> {
 
   Future<void> _guardar() async {
     if (!_form.currentState!.validate()) return;
-    setState(() => _guardando = true);
-    final nueva = await nube.cambiarClave(widget.cuenta, _clave.text);
+    setState(() {
+      _guardando = true;
+      _error = null;
+    });
+    final Cuenta nueva;
+    try {
+      nueva = await nube.cambiarClave(widget.cuenta, _clave.text);
+    } on ErrorCuenta catch (e) {
+      setState(() {
+        _guardando = false;
+        _error = e.mensaje;
+      });
+      return;
+    }
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
@@ -88,6 +101,11 @@ class _CambiarClavePantallaState extends State<CambiarClavePantalla> {
                 validar: (v) => v != _clave.text ? 'Las contraseñas no coinciden' : null,
               ),
               const SizedBox(height: 24),
+              if (_error != null)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(_error!, style: const TextStyle(color: Colores.rojo)),
+                ),
               FilledButton.icon(
                 onPressed: _guardando ? null : _guardar,
                 icon: const Icon(Icons.check_rounded),

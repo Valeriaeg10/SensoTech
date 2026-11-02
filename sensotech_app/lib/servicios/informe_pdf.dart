@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import '../modelos/agenda.dart';
 import '../modelos/cuenta.dart';
 import '../modelos/datos_brazalete.dart';
 import '../modelos/ficha_clinica.dart';
@@ -16,6 +17,7 @@ class InformePdf {
   final Rutina? rutina;
   final List<SesionRehab> sesiones; // de la más vieja a la más reciente
   final List<NotaEvolucion> notas;
+  final Agenda? agenda;
 
   InformePdf({
     required this.paciente,
@@ -24,6 +26,7 @@ class InformePdf {
     required this.rutina,
     required this.sesiones,
     required this.notas,
+    this.agenda,
   });
 
   String get nombreArchivo {
@@ -206,7 +209,31 @@ class InformePdf {
 
   // ---------------- Secciones ----------------
 
-  List<pw.Widget> _plan() {
+  List<pw.Widget> _plan() => [..._programacion(), ..._rutina()];
+
+  // Días, hora y cumplimiento de las sesiones programadas
+  List<pw.Widget> _programacion() {
+    final a = agenda;
+    if (a == null) return [_parrafo('Sesiones programadas: no registradas.')];
+    final c = Cumplimiento(a, sesiones);
+    return [
+      _pares([
+        ('Frecuencia', _s('Cada ${a.textoDias}')),
+        ('Inicio del plan', soloFecha(a.inicio)),
+        ('Sesiones programadas', '${c.total}'),
+        ('Realizadas', '${c.realizadas}'),
+        ('No asistió', '${c.perdidas}'),
+        ('Pendientes', '${c.faltan}'),
+        ('Cumplimiento', c.realizadas + c.perdidas == 0
+            ? 'Sin sesiones vencidas'
+            : '${(c.realizadas * 100 / (c.realizadas + c.perdidas)).round()} % de las sesiones vencidas'),
+        ('Próxima sesión', c.proxima == null ? 'Plan terminado' : _s(fechaSesion(c.proxima!.fecha))),
+      ]),
+      pw.SizedBox(height: 6),
+    ];
+  }
+
+  List<pw.Widget> _rutina() {
     final r = rutina;
     if (r == null) {
       return [

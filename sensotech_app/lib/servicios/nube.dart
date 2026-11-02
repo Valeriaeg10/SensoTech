@@ -2,9 +2,11 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../modelos/agenda.dart';
 import '../modelos/cuenta.dart';
 import '../modelos/ficha_clinica.dart';
 import '../modelos/rutina.dart';
+import 'nube_firebase.dart';
 
 // Error con mensaje para mostrar en pantalla
 class ErrorCuenta implements Exception {
@@ -51,6 +53,14 @@ abstract class Nube {
   Future<void> guardarRutina(String pacienteId, Rutina rutina);
   Future<List<SesionRehab>> sesionesRehab(String pacienteId);
   Future<void> guardarRehab(SesionRehab s);
+
+  // Programación de sesiones (días y hora)
+  Future<Agenda?> agenda(String pacienteId);
+  Future<void> guardarAgenda(String pacienteId, Agenda agenda);
+
+  // Solo para la demostración: pacientes de ejemplo (sin usuario para entrar)
+  String idNuevo();
+  Future<void> agregarCuentasDemo(List<Cuenta> nuevas);
 }
 
 // Nube simulada: guarda todo en el celular con la misma estructura que tendrá Firebase
@@ -68,6 +78,7 @@ class NubeLocal implements Nube {
       sha256.convert(utf8.encode('${correo.toLowerCase()}::$contrasena')).toString();
 
   String _nuevoId() => '${DateTime.now().millisecondsSinceEpoch}${_azar.nextInt(9999)}';
+  @override
   String idNuevo() => _nuevoId();
 
   Future<Map<String, Cuenta>> _cuentas() async {
@@ -260,7 +271,24 @@ class NubeLocal implements Nube {
     await p.setStringList('rehab_${s.perfilId}', l);
   }
 
+  @override
+  Future<Agenda?> agenda(String pacienteId) async {
+    final t = (await _p).getString('agenda_$pacienteId');
+    if (t == null) return null;
+    try {
+      return Agenda.desdeMapa(jsonDecode(t) as Map<String, dynamic>);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Future<void> guardarAgenda(String pacienteId, Agenda agenda) async {
+    await (await _p).setString('agenda_$pacienteId', jsonEncode(agenda.aMapa()));
+  }
+
   // Solo para la demostración: cuentas de ejemplo ya vinculadas al fisio
+  @override
   Future<void> agregarCuentasDemo(List<Cuenta> nuevas) async {
     final cuentas = await _cuentas();
     for (final c in nuevas) {
@@ -270,8 +298,8 @@ class NubeLocal implements Nube {
   }
 }
 
-// Una sola nube para toda la app
-final Nube nube = NubeLocal();
+// Una sola nube para toda la app: Firebase (NubeLocal queda para pruebas sin internet)
+final Nube nube = NubeFirebase();
 
 // Contraseña temporal fácil de dictar: 3 letras + 3 números
 String claveTemporal() {

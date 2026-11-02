@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sensotech_app/modelos/agenda.dart';
 import 'package:sensotech_app/modelos/datos_brazalete.dart';
 import 'package:sensotech_app/modelos/ejercicios.dart';
 import 'package:sensotech_app/modelos/rutina.dart';
@@ -111,5 +112,16 @@ void main() {
     expect(metaProgresiva(r1, null), 40);
     expect(metaProgresiva(r1, const {TipoEjercicio.flexion: 30}), 35);
     expect(metaProgresiva(r1, const {TipoEjercicio.flexion: 44}), 45);
+  });
+
+  test('Agenda: martes y jueves, reprogramar y cancelar', () {
+    var a = Agenda(dias: const [2, 4], hora: 11, minuto: 0, inicio: DateTime(2026, 11, 2), totalSesiones: 5,
+        actualizada: DateTime(2026, 11, 2));
+    final s = a.sesiones();
+    expect(s.length, 5);
+    expect(s.first.fecha, DateTime(2026, 11, 3, 11));
+    a = a.conCambio(s[1].original, DateTime(2026, 11, 7, 9, 30)).conCambio(s[2].original, null);
+    expect(a.sesiones().length, 5); // la cancelada se repone al final
+    expect(a.sesiones()[1].fecha, DateTime(2026, 11, 7, 9, 30));
   });
 }

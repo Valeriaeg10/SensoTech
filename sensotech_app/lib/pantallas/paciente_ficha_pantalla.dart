@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
+import '../modelos/agenda.dart';
 import '../modelos/cuenta.dart';
 import '../modelos/datos_brazalete.dart';
 import '../modelos/ejercicios.dart';
@@ -16,6 +17,7 @@ import '../widgets/formulario_ficha.dart';
 import '../widgets/grafica_dolor.dart';
 import '../widgets/grafica_rango.dart';
 import '../widgets/icono_chip.dart';
+import 'agenda_pantalla.dart';
 import 'historial_pantalla.dart';
 
 // Expediente del paciente para el fisio (solo rehabilitación: prevención es privada del paciente)
@@ -34,6 +36,7 @@ class _PacienteFichaPantallaState extends State<PacienteFichaPantalla> {
   List<NotaEvolucion> _notas = [];
   List<SesionRehab> _sesiones = [];
   Rutina? _rutina;
+  Agenda? _agenda;
   bool _cargando = true;
 
   Cuenta get _p => widget.resumen.cuenta;
@@ -49,12 +52,14 @@ class _PacienteFichaPantallaState extends State<PacienteFichaPantalla> {
     final notas = await nube.notas(_p.id);
     final sesiones = await nube.sesionesRehab(_p.id);
     final rutina = await nube.rutina(_p.id);
+    final agenda = await nube.agenda(_p.id);
     if (!mounted) return;
     setState(() {
       _ficha = ficha;
       _notas = notas;
       _sesiones = sesiones;
       _rutina = rutina;
+      _agenda = agenda;
       _cargando = false;
     });
   }
@@ -67,6 +72,7 @@ class _PacienteFichaPantallaState extends State<PacienteFichaPantalla> {
       rutina: _rutina,
       sesiones: _sesiones,
       notas: _notas,
+      agenda: _agenda,
     );
     Navigator.push(
       context,
@@ -87,7 +93,7 @@ class _PacienteFichaPantallaState extends State<PacienteFichaPantalla> {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 5,
+      length: 6,
       child: Scaffold(
         appBar: AppBar(
           title: Text(_p.nombre),
@@ -103,6 +109,7 @@ class _PacienteFichaPantallaState extends State<PacienteFichaPantalla> {
             tabAlignment: TabAlignment.start,
             tabs: [
               Tab(icon: Icon(Icons.dashboard_outlined), text: 'Resumen'),
+              Tab(icon: Icon(Icons.event_note_rounded), text: 'Agenda'),
               Tab(icon: Icon(Icons.assignment_ind_outlined), text: 'Historia clínica'),
               Tab(icon: Icon(Icons.show_chart_rounded), text: 'Progreso'),
               Tab(icon: Icon(Icons.edit_note_rounded), text: 'Evolución'),
@@ -114,7 +121,8 @@ class _PacienteFichaPantallaState extends State<PacienteFichaPantalla> {
             ? const Center(child: CircularProgressIndicator())
             : TabBarView(
                 children: [
-                  _Resumen(p: _p, ficha: _ficha, sesiones: _sesiones, rutina: _rutina, alInforme: _abrirInforme),
+                  _Resumen(p: _p, ficha: _ficha, sesiones: _sesiones, rutina: _rutina, agenda: _agenda, alInforme: _abrirInforme),
+                  PestanaAgenda(paciente: _p, agenda: _agenda, sesiones: _sesiones, alGuardar: _cargar),
                   _Historia(p: _p, ficha: _ficha, alGuardar: _cargar),
                   _Progreso(sesiones: _sesiones),
                   _Evolucion(p: _p, fisio: widget.fisio, sesiones: _sesiones, notas: _notas, alCambiar: _cargar),
@@ -160,17 +168,30 @@ class _Resumen extends StatelessWidget {
   final FichaClinica? ficha;
   final List<SesionRehab> sesiones;
   final Rutina? rutina;
+  final Agenda? agenda;
   final VoidCallback alInforme;
 
-  const _Resumen({required this.p, required this.ficha, required this.sesiones, required this.rutina, required this.alInforme});
+  const _Resumen({
+    required this.p,
+    required this.ficha,
+    required this.sesiones,
+    required this.rutina,
+    required this.agenda,
+    required this.alInforme,
+  });
 
   // Alertas clínicas sencillas para el fisio
   List<String> _alertas() {
     final a = <String>[];
-    if (sesiones.isEmpty) return ['El paciente aún no ha hecho sesiones de rehabilitación.'];
+    if (agenda == null) a.add('No tiene sesiones programadas: prográmalas en la pestaña Agenda.');
+    if (agenda != null) {
+      final c = Cumplimiento(agenda!, sesiones);
+      if (c.perdidasRecientes > 0) {
+        a.add('No asistió a ${c.perdidasRecientes} de sus últimas sesiones programadas.');
+      }
+    }
+    if (sesiones.isEmpty) return [...a, 'El paciente aún no ha hecho sesiones de rehabilitación.'];
     final u = sesiones.last;
-    final dias = DateTime.now().difference(u.fecha).inDays;
-    if (dias > 7) a.add('Lleva $dias días sin sesión de rehabilitación.');
     if (u.dolorAntes != null && u.dolorDespues != null && u.dolorDespues! > u.dolorAntes!) {
       a.add('En la última sesión el dolor aumentó (${u.dolorAntes} → ${u.dolorDespues}).');
     }
@@ -237,7 +258,15 @@ class _Resumen extends StatelessWidget {
         const SizedBox(height: 14),
         Row(
           children: [
-            Expanded(child: _dato(Icons.fitness_center_rounded, 'Sesiones', '${sesiones.length}')),
+            Expanded(
+              child: _dato(
+                Icons.event_available_rounded,
+                'Plan',
+                agenda == null
+                    ? '${sesiones.length} hechas'
+                    : '${Cumplimiento(agenda!, sesiones).realizadas}/${agenda!.totalSesiones}',
+              ),
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: _dato(Icons.task_alt_rounded, 'Completas',

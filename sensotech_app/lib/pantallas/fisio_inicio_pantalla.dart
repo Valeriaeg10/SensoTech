@@ -159,9 +159,9 @@ class _FisioInicioPantallaState extends State<FisioInicioPantalla> {
       children: [
         Expanded(child: _contador('Al día', n(Constancia.alDia), Colores.verde)),
         const SizedBox(width: 10),
-        Expanded(child: _contador('Pendientes', n(Constancia.pendiente), Colores.amarillo)),
+        Expanded(child: _contador('Faltó a 1', n(Constancia.pendiente), Colores.amarillo)),
         const SizedBox(width: 10),
-        Expanded(child: _contador('Inactivos', n(Constancia.inactivo), Colores.rojo)),
+        Expanded(child: _contador('Faltó a 2+', n(Constancia.inactivo), Colores.rojo)),
       ],
     );
   }
@@ -190,8 +190,9 @@ class _FisioInicioPantallaState extends State<FisioInicioPantalla> {
   Widget _filaPaciente(ResumenPaciente p) {
     final (color, texto) = switch (p.constancia) {
       Constancia.alDia => (Colores.verde, 'Al día'),
-      Constancia.pendiente => (Colores.amarillo, 'Pendiente'),
-      Constancia.inactivo => (Colores.rojo, 'Inactivo'),
+      Constancia.pendiente => (Colores.amarillo, 'Faltó 1'),
+      Constancia.inactivo => (Colores.rojo, 'Faltó 2+'),
+      Constancia.sinProgramar => (Colores.textoSuave, 'Sin agenda'),
     };
     return InkWell(
       borderRadius: BorderRadius.circular(18),
@@ -220,12 +221,7 @@ class _FisioInicioPantallaState extends State<FisioInicioPantalla> {
                 children: [
                   Text(p.cuenta.nombre, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
                   const SizedBox(height: 2),
-                  Text(
-                    p.rehab.isEmpty || p.rehab.last.dolorAntes == null
-                        ? p.textoActividad
-                        : '${p.textoActividad} · EVA ${p.rehab.last.dolorAntes}/10',
-                    style: const TextStyle(color: Colores.textoSuave, fontSize: 12),
-                  ),
+                  Text(p.textoActividad, style: const TextStyle(color: Colores.textoSuave, fontSize: 12)),
                 ],
               ),
             ),

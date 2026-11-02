@@ -146,24 +146,25 @@ class _TarjetaEjercicioGuiadoState extends State<TarjetaEjercicioGuiado> {
                     descripcion: def?.instruccion,
                   ),
                 ] else ...[
-                  Row(
-                    children: [
-                      Expanded(child: _rotulo(Icons.sensors_rounded, 'Tu muñeca en vivo', null)),
-                      TextButton.icon(
-                        onPressed: () => AnimacionEjercicio.abrir(
-                          context,
-                          demo,
-                          izquierda: widget.izquierda,
-                          meta: metaDemo,
-                          titulo: TarjetaEjercicioGuiado.nombreDe(e),
-                          descripcion: def?.instruccion,
-                        ),
-                        icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
-                        label: const Text('Ver demostración'),
-                      ),
-                    ],
-                  ),
+                  _rotulo(Icons.sensors_rounded, 'Tu muñeca en vivo', null),
+                  const SizedBox(height: 6),
                   _enVivo(e, l, demo),
+                  // Botón aparte, debajo del brazo, para que no se monte sobre el título
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => AnimacionEjercicio.abrir(
+                        context,
+                        demo,
+                        izquierda: widget.izquierda,
+                        meta: metaDemo,
+                        titulo: TarjetaEjercicioGuiado.nombreDe(e),
+                        descripcion: def?.instruccion,
+                      ),
+                      icon: const Icon(Icons.play_circle_outline_rounded, size: 18),
+                      label: const Text('Ver demostración'),
+                    ),
+                  ),
                 ],
                 const SizedBox(height: 14),
                 if (e.descanso > 0)
@@ -193,10 +194,17 @@ class _TarjetaEjercicioGuiadoState extends State<TarjetaEjercicioGuiado> {
         children: [
           Icon(i, size: 18, color: Colores.primario),
           const SizedBox(width: 6),
-          Text(t, style: const TextStyle(fontWeight: FontWeight.w700, color: Colores.primarioOscuro)),
+          Flexible(
+            child: Text(t,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w700, color: Colores.primarioOscuro)),
+          ),
           if (sub != null) ...[
             const SizedBox(width: 8),
-            Text(sub, style: const TextStyle(color: Colores.textoSuave, fontSize: 12)),
+            Flexible(
+              child: Text(sub,
+                  overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colores.textoSuave, fontSize: 12)),
+            ),
           ],
         ],
       );
