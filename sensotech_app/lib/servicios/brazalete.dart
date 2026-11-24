@@ -7,6 +7,9 @@ abstract class Brazalete {
   bool get conectado;
   int get bateria; // %
 
+  // true al conectar, false al desconectar (también si se pierde la señal)
+  Stream<bool> get conexion;
+
   // Lecturas en vivo (característica 0001)
   Stream<LecturaEnVivo> get lecturas;
 

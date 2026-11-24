@@ -6,6 +6,7 @@ import '../modelos/perfil.dart';
 import '../modelos/rutina.dart';
 import '../servicios/brazalete.dart';
 import '../servicios/brazalete_simulado.dart';
+import '../servicios/selector_brazalete.dart';
 import '../servicios/nube.dart';
 import '../tema/colores.dart';
 import '../tema/tema_app.dart';
@@ -275,7 +276,9 @@ class _RehabilitacionPantallaState extends State<RehabilitacionPantalla> {
                 : 'Al final, el brazalete mide tu rango articular para ver tu progreso.',
             style: const TextStyle(color: Colores.textoSuave, fontSize: 12),
           ),
-          if (widget.brazalete is BrazaleteSimulado && BrazaleteSimulado.abreviado)
+          if (BrazaleteSimulado.abreviado &&
+              (widget.brazalete is BrazaleteSimulado ||
+                  (widget.brazalete is SelectorBrazalete && (widget.brazalete as SelectorBrazalete).usarSimulado)))
             const Padding(
               padding: EdgeInsets.only(top: 6),
               child: Text('Simulación abreviada: menos repeticiones y descansos cortos.',

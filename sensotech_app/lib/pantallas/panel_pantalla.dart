@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../modelos/cuenta.dart';
 import '../modelos/datos_brazalete.dart';
 import '../modelos/perfil.dart';
 import '../servicios/brazalete.dart';
+import '../servicios/brazalete_ble.dart';
+import '../servicios/selector_brazalete.dart';
 import '../servicios/repositorio_perfiles.dart';
 import '../tema/colores.dart';
 import '../tema/tema_app.dart';
@@ -32,21 +35,53 @@ class _PanelPantallaState extends State<PanelPantalla> {
   late Perfil _perfil = widget.perfil; // se actualiza con el último tipo de trabajo
 
   Brazalete get _b => widget.brazalete;
+  StreamSubscription<bool>? _subConexion;
+
+  @override
+  void initState() {
+    super.initState();
+    // Si se pierde la conexión (lejos, apagado o sin batería), avisar
+    _subConexion = _b.conexion.listen((ok) {
+      if (!mounted) return;
+      setState(() {});
+      if (!ok && !_desconectandoYo) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Se perdió la conexión con el brazalete. El brazalete sigue funcionando solo.'),
+          behavior: SnackBarBehavior.floating,
+        ));
+      }
+      _desconectandoYo = false;
+    });
+  }
+
+  bool _desconectandoYo = false;
 
   @override
   void dispose() {
+    _subConexion?.cancel();
+    _desconectandoYo = true;
     _b.desconectar(); // al salir del perfil se desconecta
     super.dispose();
   }
 
   Future<void> _alternarConexion() async {
     if (_b.conectado) {
+      _desconectandoYo = true;
       await _b.desconectar();
       setState(() {});
       return;
     }
     setState(() => _conectando = true);
-    await _b.conectar();
+    try {
+      await _b.conectar();
+    } on ErrorBrazalete catch (e) {
+      if (!mounted) return;
+      setState(() => _conectando = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.mensaje), behavior: SnackBarBehavior.floating),
+      );
+      return;
+    }
     if (!mounted) return;
     setState(() => _conectando = false);
 
@@ -105,6 +140,7 @@ class _PanelPantallaState extends State<PanelPantalla> {
     }
     _perfil = _perfil.conModo(ModoBrazalete.prevencion, tipo: tipo);
     await RepositorioPerfiles().guardar(_perfil); // recuerda modo y tipo
+    await _b.sincronizar(null, izquierda: _perfil.mano == Mano.izquierda); // hora y mano
     await _b.enviarModo(ModoBrazalete.prevencion, tipoTrabajo: tipo.index);
     if (!mounted) return;
     final cambiarModo = await Navigator.push<bool>(
@@ -243,6 +279,21 @@ class _PanelPantallaState extends State<PanelPantalla> {
                       : const Icon(Icons.bluetooth_searching_rounded),
                   label: Text(_conectando ? 'Buscando…' : 'Conectar brazalete'),
                 ),
+          // Elegir brazalete real o simulado (solo desconectado)
+          if (!conectado && _b is SelectorBrazalete)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text('Usar brazalete simulado', style: TextStyle(fontSize: 13)),
+              subtitle: const Text('Para probar la app sin el dispositivo', style: TextStyle(fontSize: 11)),
+              value: (_b as SelectorBrazalete).usarSimulado,
+              onChanged: _conectando
+                  ? null
+                  : (v) async {
+                      await (_b as SelectorBrazalete).elegirSimulado(v);
+                      if (mounted) setState(() {});
+                    },
+            ),
         ],
       ),
     );

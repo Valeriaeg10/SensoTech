@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../modelos/cuenta.dart';
 import '../modelos/perfil.dart';
-import '../servicios/brazalete.dart';
-import '../servicios/brazalete_simulado.dart';
+import '../servicios/selector_brazalete.dart';
 import '../servicios/nube.dart';
 import '../servicios/repositorio_perfiles.dart';
 import '../widgets/logo.dart';
@@ -11,8 +10,8 @@ import 'fisio_inicio_pantalla.dart';
 import 'login_pantalla.dart';
 import 'panel_pantalla.dart';
 
-// Un solo brazalete para toda la app (simulado por ahora)
-final Brazalete brazaleteApp = BrazaleteSimulado();
+// Un solo brazalete para toda la app: real por Bluetooth o simulado (se elige en el panel)
+final SelectorBrazalete brazaleteApp = SelectorBrazalete();
 
 // Pantalla inicial según el rol de la cuenta
 Widget inicioSegunRol(Cuenta c) {
@@ -37,6 +36,7 @@ class _ArranqueState extends State<Arranque> {
 
   Future<void> _decidir() async {
     Cuenta? c;
+    await brazaleteApp.cargarPreferencia();
     try {
       c = await nube.sesionActual().timeout(const Duration(seconds: 5));
     } catch (_) {

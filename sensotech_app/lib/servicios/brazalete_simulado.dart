@@ -49,6 +49,7 @@ class BrazaleteSimulado implements Brazalete {
   final _lecturas = StreamController<LecturaEnVivo>.broadcast();
   final _ejercicio = StreamController<EjercicioEnCurso>.broadcast();
   final _resultados = StreamController<ResultadoRehab>.broadcast();
+  final _conexion = StreamController<bool>.broadcast();
   final _azar = Random();
   Timer? _timer;
   bool _conectado = false;
@@ -109,12 +110,16 @@ class BrazaleteSimulado implements Brazalete {
   Stream<ResultadoRehab> get resultados => _resultados.stream;
 
   @override
+  Stream<bool> get conexion => _conexion.stream;
+
+  @override
   Future<void> conectar() async {
     await Future.delayed(const Duration(milliseconds: 800)); // simula la búsqueda
     _conectado = true;
     _t = 0;
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(milliseconds: 100), (_) => _tick());
+    _conexion.add(true);
   }
 
   @override
@@ -123,6 +128,7 @@ class BrazaleteSimulado implements Brazalete {
     _timer = null;
     _conectado = false;
     _detener();
+    _conexion.add(false);
   }
 
   @override

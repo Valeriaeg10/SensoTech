@@ -6,6 +6,7 @@ import '../modelos/perfil.dart';
 import '../modelos/sesion.dart';
 import '../servicios/brazalete.dart';
 import '../servicios/brazalete_simulado.dart';
+import '../servicios/selector_brazalete.dart';
 import '../servicios/repositorio_perfiles.dart';
 import '../servicios/repositorio_sesiones.dart';
 import '../tema/colores.dart';
@@ -56,6 +57,10 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
   Future<void> _elegirMano(Mano m) async {
     setState(() => _perfil = _perfil.conMano(m));
     await RepositorioPerfiles().guardar(_perfil);
+    // El brazalete invierte la desviación en la mano izquierda: hay que avisarle
+    try {
+      await widget.brazalete.sincronizar(null, izquierda: m == Mano.izquierda);
+    } catch (_) {}
   }
 
   @override
@@ -77,6 +82,13 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
   // Cada lectura equivale a 0,1 s
   void _recibir(LecturaEnVivo l) {
     final antes = _ultima;
+    // La jornada se terminó desde el brazalete (botón 5 s)
+    final estabaMidiendo = antes != null && (antes.fase == FaseBrazalete.midiendo || _esPausa(antes));
+    if (estabaMidiendo && l.fase == FaseBrazalete.menu && !_guardada) {
+      _ultima = l;
+      _terminar();
+      return;
+    }
     setState(() {
       _trabajo += 0.1;
       if (_esPausa(l)) {
@@ -173,7 +185,9 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
   Widget build(BuildContext context) {
     final l = _ultima;
     final e = _ejercicio;
-    final simulado = widget.brazalete is BrazaleteSimulado;
+    final b = widget.brazalete;
+    final BrazaleteSimulado? simulado =
+        b is SelectorBrazalete ? b.simuladoActivo : (b is BrazaleteSimulado ? b : null);
 
     return Scaffold(
       appBar: AppBar(
@@ -249,7 +263,7 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
   }
 
   // Cuenta regresiva para la pausa activa
-  Widget _tarjetaPausa(bool simulado) {
+  Widget _tarjetaPausa(BrazaleteSimulado? simulado) {
     final total = widget.tipo.minutosPausa * 60.0;
     final avance = (_desdePausa / total).clamp(0.0, 1.0).toDouble();
     final faltan = (total - _desdePausa).clamp(0.0, total).toDouble();
@@ -286,10 +300,10 @@ class _PrevencionPantallaState extends State<PrevencionPantalla> {
               'isométrico en extensión y activación de dedos.',
               style: const TextStyle(color: Colores.textoSuave, fontSize: 12)),
           // Solo con el simulado, para no esperar 45 o 60 minutos
-          if (simulado) ...[
+          if (simulado != null) ...[
             const SizedBox(height: 10),
             TextButton.icon(
-              onPressed: () => (widget.brazalete as BrazaleteSimulado).simularPausaAhora(),
+              onPressed: () => simulado.simularPausaAhora(),
               icon: const Icon(Icons.fast_forward_rounded, size: 18),
               label: const Text('Probar pausa ahora (simulación)'),
             ),
